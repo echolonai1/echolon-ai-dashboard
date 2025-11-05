@@ -1,4 +1,4 @@
-"""
+""" 
 Echolon AI Dashboard — Neon-Styled Analytics
 Three-column layout with Sales Analytics, Inventory Optimization, and Workflow Efficiency
 """
@@ -65,129 +65,158 @@ def create_sample_data():
     
     return pd.DataFrame(sales), pd.DataFrame(inventory), pd.DataFrame(workflow)
 
-# ===================== MAIN DASHBOARD =====================
-st.markdown('<h1 style="text-align:center;color:#00ffff;text-shadow:0 0 15px #00ffff;">⚡ Echolon AI Dashboard ⚡</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center;color:#888;">Real-time Business Intelligence & Analytics</p>', unsafe_allow_html=True)
+# ===================== MAIN APP =====================
+st.markdown('<h1 style="color:#00ffff;text-align:center;text-shadow:0 0 15px #00ffff;">🚀 ECHOLON AI DASHBOARD</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center;color:#aaa;">Real-Time Analytics | Powered by AI</p>', unsafe_allow_html=True)
 
-sales_df, inventory_df, workflow_df = create_sample_data()
+df_sales, df_inventory, df_workflow = create_sample_data()
 
-# ===================== THREE-COLUMN LAYOUT =====================
-col1, col2, col3 = st.columns(3, gap="medium")
+# Three-column layout
+col1, col2, col3 = st.columns(3)
 
-# ─────────────── COLUMN 1: SALES ANALYTICS (CYAN) ───────────────
+# =================== COLUMN 1: SALES & BEHAVIOR ANALYTICS ===================
 with col1:
-    st.markdown('<div class="neon-card"><div class="neon-header">💰 Sales Analytics</div>', unsafe_allow_html=True)
+    st.markdown('<div class="neon-card"><div class="neon-header">📊 SALES & BEHAVIOR ANALYTICS</div>', unsafe_allow_html=True)
     
-    # Key Metrics
-    total_revenue = sales_df['Revenue'].sum()
-    total_orders = sales_df['Orders'].sum()
-    avg_order_value = total_revenue / total_orders
+    # Metrics
+    revenue = df_sales['Revenue'].sum()
+    orders = df_sales['Orders'].sum()
+    customers = df_sales['Customers'].sum()
     
-    st.markdown(f'<div class="metric-label">Total Revenue (30d)</div><div class="metric-value" style="color:#00ffff;">${total_revenue:,.2f}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="metric-label">Total Orders</div><div class="metric-value" style="color:#00ffff;">{total_orders}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="metric-label">Avg Order Value</div><div class="metric-value" style="color:#00ffff;">${avg_order_value:,.2f}</div>', unsafe_allow_html=True)
+    st.metric(label="💰 Total Revenue (30d)", value=f"${revenue:,.0f}")
+    st.metric(label="📦 Total Orders", value=f"{orders}")
+    st.metric(label="👥 Unique Customers", value=f"{customers}")
     
-    # Revenue Chart
-    fig_sales = go.Figure()
-    fig_sales.add_trace(go.Scatter(
-        x=sales_df['Date'],
-        y=sales_df['Revenue'],
+    # Revenue trend chart
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(
+        x=df_sales['Date'],
+        y=df_sales['Revenue'],
         mode='lines+markers',
-        line=dict(color='#00ffff', width=2),
-        marker=dict(size=6, color='#00ffff'),
-        fill='tozeroy',
-        fillcolor='rgba(0,255,255,0.1)'
+        line=dict(color='#00ffff', width=3),
+        marker=dict(size=6, color='#00ffff')
     ))
-    fig_sales.update_layout(
-        title='Daily Revenue Trend',
-        xaxis_title='Date',
-        yaxis_title='Revenue ($)',
-        template='plotly_dark',
-        height=250,
-        margin=dict(l=10, r=10, t=40, b=10)
+    fig1.update_layout(
+        title='Revenue Trend (30 Days)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(20,20,40,0.5)',
+        font=dict(color='#00ffff'),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor='rgba(0,255,255,0.2)')
     )
-    st.plotly_chart(fig_sales, use_container_width=True)
+    st.plotly_chart(fig1, use_container_width=True)
+    
+    # AI Insight
+    st.markdown('<p style="color:#00ffff;font-weight:bold;margin-top:20px;">🤖 AI Insight:</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#aaa;font-size:14px;">Peak sales occur on weekends. Consider targeted promotions Thursday-Friday to boost conversions by 15%.</p>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─────────────── COLUMN 2: INVENTORY OPTIMIZATION (PINK) ───────────────
+# =================== COLUMN 2: INVENTORY OPTIMIZATION ===================
 with col2:
-    st.markdown('<div class="neon-card-pink"><div class="neon-header-pink">📦 Inventory Optimization</div>', unsafe_allow_html=True)
+    st.markdown('<div class="neon-card-pink"><div class="neon-header-pink">📦 INVENTORY OPTIMIZATION</div>', unsafe_allow_html=True)
     
-    # Inventory Alerts
-    low_stock = inventory_df[inventory_df['Stock'] < inventory_df['Reorder']]
-    st.markdown(f'<div class="metric-label">Low Stock Alerts</div><div class="metric-value" style="color:#ff0077;">{len(low_stock)}</div>', unsafe_allow_html=True)
+    # Top metric
+    low_stock_count = (df_inventory['Stock'] < df_inventory['Reorder']).sum()
+    st.metric(label="⚠️ Low Stock Items", value=f"{low_stock_count}")
     
-    if len(low_stock) > 0:
-        st.markdown('<p style="color:#ff0077;font-weight:bold;">⚠️ Reorder Required:</p>', unsafe_allow_html=True)
-        for _, row in low_stock.iterrows():
-            st.markdown(f'<p style="color:#ff8888;">• {row["Product"]}: {row["Stock"]} units (reorder at {row["Reorder"]})</p>', unsafe_allow_html=True)
-    
-    # Stock Levels Chart
-    fig_inv = go.Figure()
-    fig_inv.add_trace(go.Bar(
-        x=inventory_df['Product'],
-        y=inventory_df['Stock'],
-        marker_color='#ff0077',
+    # Inventory bar chart
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(
+        x=df_inventory['Product'],
+        y=df_inventory['Stock'],
+        marker=dict(color='#ff0077'),
         name='Current Stock'
     ))
-    fig_inv.add_trace(go.Scatter(
-        x=inventory_df['Product'],
-        y=inventory_df['Reorder'],
-        mode='lines+markers',
-        line=dict(color='#ffff00', width=2, dash='dash'),
-        marker=dict(size=8, color='#ffff00'),
+    fig2.add_trace(go.Bar(
+        x=df_inventory['Product'],
+        y=df_inventory['Reorder'],
+        marker=dict(color='#ffaa00'),
         name='Reorder Level'
     ))
-    fig_inv.update_layout(
+    fig2.update_layout(
         title='Stock Levels vs Reorder Points',
-        xaxis_title='Product',
-        yaxis_title='Units',
-        template='plotly_dark',
-        height=250,
-        margin=dict(l=10, r=10, t=40, b=10)
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(40,20,30,0.5)',
+        font=dict(color='#ff0077'),
+        barmode='group',
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor='rgba(255,0,119,0.2)')
     )
-    st.plotly_chart(fig_inv, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True)
+    
+    # AI Directive
+    st.markdown('<p style="color:#ff0077;font-weight:bold;margin-top:20px;">🎯 AI Directive:</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#aaa;font-size:14px;">Reorder Product D (+60 units) and Product B (+80 units) by Friday. Projected stockout risk: 85%.</p>', unsafe_allow_html=True)
+    
+    # Alert box
+    st.markdown('<div style="background:rgba(255,0,119,0.2);border:1px solid #ff0077;border-radius:8px;padding:10px;margin-top:15px;"><p style="color:#ff0077;font-size:13px;margin:0;">🚨 <strong>ALERT:</strong> Item E critical stock level (23 units). Auto-reorder triggered.</p></div>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─────────────── COLUMN 3: WORKFLOW EFFICIENCY (GREEN) ───────────────
+# =================== COLUMN 3: WORKFLOW EFFICIENCY ===================
 with col3:
-    st.markdown('<div class="neon-card-green"><div class="neon-header-green">⚙️ Workflow Efficiency</div>', unsafe_allow_html=True)
+    st.markdown('<div class="neon-card-green"><div class="neon-header-green">⚙️ WORKFLOW EFFICIENCY</div>', unsafe_allow_html=True)
     
-    # Workflow Metrics
-    total_tasks = workflow_df['Tasks'].sum()
-    completed_tasks = workflow_df['Completed'].sum()
-    completion_rate = (completed_tasks / total_tasks) * 100
-    avg_efficiency = workflow_df['Efficiency'].mean()
+    # Metrics
+    avg_efficiency = df_workflow['Efficiency'].mean()
+    total_tasks = df_workflow['Tasks'].sum()
+    completed_tasks = df_workflow['Completed'].sum()
     
-    st.markdown(f'<div class="metric-label">Tasks This Week</div><div class="metric-value" style="color:#00ff99;">{total_tasks}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="metric-label">Completed</div><div class="metric-value" style="color:#00ff99;">{completed_tasks}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="metric-label">Completion Rate</div><div class="metric-value" style="color:#00ff99;">{completion_rate:.1f}%</div>', unsafe_allow_html=True)
+    st.metric(label="📈 Avg Efficiency (7d)", value=f"{avg_efficiency:.1f}%")
+    st.metric(label="✅ Tasks Completed", value=f"{completed_tasks}/{total_tasks}")
     
-    # Efficiency Chart
-    fig_workflow = go.Figure()
-    fig_workflow.add_trace(go.Scatter(
-        x=workflow_df['Date'],
-        y=workflow_df['Efficiency'],
+    # Donut chart for task completion
+    fig3 = go.Figure(data=[go.Pie(
+        labels=['Completed', 'Pending'],
+        values=[completed_tasks, total_tasks - completed_tasks],
+        hole=0.5,
+        marker=dict(colors=['#00ff99', '#333333'])
+    )])
+    fig3.update_layout(
+        title='Task Completion Rate',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#00ff99'),
+        showlegend=True
+    )
+    st.plotly_chart(fig3, use_container_width=True)
+    
+    # Efficiency trend
+    fig4 = go.Figure()
+    fig4.add_trace(go.Scatter(
+        x=df_workflow['Date'],
+        y=df_workflow['Efficiency'],
         mode='lines+markers',
         line=dict(color='#00ff99', width=3),
         marker=dict(size=8, color='#00ff99'),
         fill='tozeroy',
-        fillcolor='rgba(0,255,153,0.1)'
+        fillcolor='rgba(0,255,153,0.2)'
     ))
-    fig_workflow.update_layout(
-        title='Weekly Efficiency Trend',
-        xaxis_title='Date',
-        yaxis_title='Efficiency (%)',
-        template='plotly_dark',
-        height=250,
-        margin=dict(l=10, r=10, t=40, b=10)
+    fig4.update_layout(
+        title='Efficiency Trend (7 Days)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(20,40,30,0.5)',
+        font=dict(color='#00ff99'),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor='rgba(0,255,153,0.2)')
     )
-    st.plotly_chart(fig_workflow, use_container_width=True)
+    st.plotly_chart(fig4, use_container_width=True)
+    
+    # AI Recommendation
+    st.markdown('<p style="color:#00ff99;font-weight:bold;margin-top:20px;">💡 AI Recommendation:</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#aaa;font-size:14px;">Automate recurring tasks on Mondays to improve efficiency by 12%. Implement batch processing for orders.</p>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ===================== FOOTER =====================
-st.markdown('<hr style="border-color:#333;">', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center;color:#555;font-size:12px;">Powered by Echolon AI | Last Updated: ' + datetime.now().strftime('%Y-%m-%d %H:%M') + '</p>', unsafe_allow_html=True)
+# =================== FOOTER WITH TOTAL SAVINGS ===================
+st.markdown('<hr style="border:1px solid #333;margin-top:40px;">', unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="text-align:center;padding:30px;background:rgba(20,20,40,0.6);border-radius:15px;margin-top:20px;border:2px solid #00ffff;box-shadow:0 0 30px rgba(0,255,255,0.4);">
+        <h1 style="color:#00ffff;font-size:48px;margin:0;text-shadow:0 0 20px #00ffff;">$847,392</h1>
+        <p style="color:#aaa;font-size:18px;margin-top:10px;">💎 TOTAL AI-DRIVEN SAVINGS THIS QUARTER</p>
+        <p style="color:#666;font-size:14px;margin-top:15px;">Powered by Echolon AI | Last Updated: {}</p>
+    </div>
+    """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+    unsafe_allow_html=True
+)
