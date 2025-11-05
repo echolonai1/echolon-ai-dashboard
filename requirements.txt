@@ -6,4 +6,4 @@ gspread
 oauth2client
 openai
 firebase-admin
-supabase-py
+supabase
