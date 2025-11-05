@@ -1,0 +1,9 @@
+streamlit
+pandas
+prophet
+matplotlib
+gspread
+oauth2client
+openai
+firebase-admin
+supabase-py
