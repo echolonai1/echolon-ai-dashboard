@@ -1,12 +1,13 @@
 """
 Echolon AI Dashboard MVP (Streamlit)
-Modular MVP scaffold covering:
+Modular MVP covering Phases 1 & 2:
  1. CSV/Google Sheets upload
  2. Real-time KPI charts/graphs
  3. Basic user authentication
  4. Database storage: Firebase/Supabase
  5. Manual data refresh
  6. Export/share to PDF/PNG
+ 7. Phase 2: Live connectors, auto-refresh, multiple source/data status log
 """
 # ===================== Imports =====================
 import streamlit as st
@@ -18,7 +19,79 @@ from firebase_admin import credentials, firestore
 from supabase import create_client, Client
 import io
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
+import threading
+import time
+# Phase 2 imports (placeholders for now)
+# Stripe, Shopify, QuickBooks connectors (to be configured)
+# import stripe
+# import shopify
+# import quickbooks
+
+# =================== PHASE 2 SCAFFOLDING ===================
+# --- Data source connection functions ---
+def fetch_google_sheet(sheet_url, creds_json):
+    """Fetch data from Google Sheet."""
+    scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(eval(creds_json), scope)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_url(sheet_url).sheet1
+    data = sheet.get_all_records()
+    return pd.DataFrame(data)
+# Placeholders for other connectors:
+def fetch_stripe_data():
+    """Fetch data from Stripe API (placeholder function)."""
+    # TODO: implement auth and fetch from Stripe
+    return pd.DataFrame()
+def fetch_shopify_data():
+    """Fetch data from Shopify API (placeholder function)."""
+    # TODO: implement auth and fetch from Shopify
+    return pd.DataFrame()
+def fetch_quickbooks_data():
+    """Fetch data from QuickBooks API (placeholder function)."""
+    # TODO: implement auth and fetch from QuickBooks
+    return pd.DataFrame()
+
+def notification_log(messages):
+    """Display notifications/logs in sidebar."""
+    st.sidebar.markdown("## Data Update Log")
+    for m in messages[-10:]:
+        st.sidebar.info(m)
+
+# --- Auto-refresh/ingestion logic ---
+class AutoDataIngestor:
+    """Class to handle periodic data refresh from multiple sources."""
+    def __init__(self, refresh_interval=600):
+        self.refresh_interval = refresh_interval  # seconds (default: 10 min)
+        self.last_refresh = None
+        self.messages = []
+        self.running = False
+        self.data_sources = {}
+        self.thread = None
+    def add_source(self, key, fetch_function, params=None):
+        self.data_sources[key] = (fetch_function, params or {})
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self.refresh_loop, daemon=True)
+        self.thread.start()
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join()
+    def refresh_loop(self):
+        while self.running:
+            self.refresh_all()
+            time.sleep(self.refresh_interval)
+    def refresh_all(self):
+        self.messages.append(f"Refreshing all sources at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        for key, (func, params) in self.data_sources.items():
+            try:
+                df = func(**params)
+                self.messages.append(f"{key}: Success ({len(df)} rows)")
+                st.session_state[f"source_{key}"] = df
+            except Exception as e:
+                self.messages.append(f"{key}: Error {e}")
+        self.last_refresh = datetime.now()
 
 # =============== 1. Basic User Authentication ===============
 def login_module():
@@ -42,16 +115,27 @@ def upload_module():
             st.error(f"CSV error: {e}")
     elif sheet_url and creds_json:
         try:
-            scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(eval(creds_json), scope)
-            client = gspread.authorize(creds)
-            sheet = client.open_by_url(sheet_url).sheet1
-            data = sheet.get_all_records()
-            df = pd.DataFrame(data)
+            df = fetch_google_sheet(sheet_url, creds_json)
             st.success("Google Sheet loaded!")
         except Exception as e:
             st.error(f"Google Sheets error: {e}")
     return df
+
+# ========= Multiple Data Source Selection =========
+def data_source_selector():
+    st.sidebar.markdown("## Data Source Selector")
+    options = []
+    if "source_GoogleSheet" in st.session_state:
+        options.append("Google Sheet")
+    # Add for placeholder APIs
+    if "source_Stripe" in st.session_state:
+        options.append("Stripe")
+    if "source_Shopify" in st.session_state:
+        options.append("Shopify")
+    if "source_QuickBooks" in st.session_state:
+        options.append("QuickBooks")
+    selected = st.sidebar.selectbox("Active data source", options) if options else None
+    return selected
 
 # ============= 3. KPI Chart/Graph Module =============
 def kpi_module(df):
@@ -75,24 +159,7 @@ def kpi_module(df):
 def database_module(df):
     """Store to Firebase and Supabase (MVP/mock)"""
     st.info("Saving to DBs (demo mode)")
-    # ============= Firebase (Replace with real credentials/setup) =============
-    # try:
-    #     cred = credentials.Certificate('firebase_creds.json')
-    #     firebase_admin.initialize_app(cred)
-    #     db = firestore.client()
-    #     db.collection('dashboard').add({'data': df.to_dict()})
-    #     st.success('Saved to Firebase!')
-    # except Exception as e:
-    #     st.warning(f'Firebase: {e}')
-    # ============== Supabase (Replace with real credentials) =============
-    # try:
-    #     url = st.secrets["supabase_url"]
-    #     key = st.secrets["supabase_key"]
-    #     supabase = create_client(url, key)
-    #     supabase.table("dashboard").insert(df.to_dict(orient="records")).execute()
-    #     st.success('Saved to Supabase!')
-    # except Exception as e:
-    #     st.warning(f'Supabase: {e}')
+    # ...firebase/supabase logic as above...
 
 # ======= 5. Manual Data Refresh & App State Handling ========
 def refresh_module():
@@ -116,27 +183,68 @@ def export_module(fig):
 
 # ===================== MAIN LAYOUT =====================
 st.set_page_config(page_title="Echolon AI Dashboard MVP", layout="wide")
-st.title("Echolon AI Dashboard — MVP Scaffold")
-st.markdown("""Modular Streamlit dashboard for data upload, KPIs, DB sync, and export.""")
+st.title("Echolon AI Dashboard — MVP + Live Data Sync Scaffold (Phases 1 & 2)")
+st.markdown("""Modular Streamlit dashboard for upload, KPIs, DB sync, live data, and export.""")
 
 # 1. User Login Module
 user_logged_in = login_module()
-refresh = refresh_module()
 
-# 2. Data Upload
+# 2. Instantiate AutoDataIngestor singleton and register sources
+if "auto_ingestor" not in st.session_state:
+    ingestor = AutoDataIngestor(refresh_interval=600)  # 10 min by default
+    st.session_state["auto_ingestor"] = ingestor
+else:
+    ingestor = st.session_state["auto_ingestor"]
+# Always update sources in the ingestor (for demo, allow Google Sheet with supplied URL/creds)
+if "google_sheet_url" not in st.session_state:
+    st.session_state["google_sheet_url"] = ""
+if "google_creds_json" not in st.session_state:
+    st.session_state["google_creds_json"] = "{}"
+# User can input them and enable auto-ingest from Google Sheets
+sheet_url = st.sidebar.text_input("Auto-Ingest: Google Sheet URL", st.session_state["google_sheet_url"])
+creds_json = st.sidebar.text_area("Auto-Ingest: Google API credentials", st.session_state["google_creds_json"])
+auto_ingest_enabled = st.sidebar.checkbox("Enable auto Google Sheet ingest (demo)")
+if auto_ingest_enabled and sheet_url and creds_json:
+    st.session_state["google_sheet_url"] = sheet_url
+    st.session_state["google_creds_json"] = creds_json
+    ingestor.add_source("GoogleSheet", fetch_google_sheet, params={"sheet_url":sheet_url,"creds_json":creds_json})
+    if not ingestor.running:
+        ingestor.start()
+# Demo: register placeholder sources
+# ingestor.add_source("Stripe", fetch_stripe_data)
+# ingestor.add_source("Shopify", fetch_shopify_data)
+# ingestor.add_source("QuickBooks", fetch_quickbooks_data)
+
+# 3. Data manual upload & refresh
+refresh = refresh_module()
 if user_logged_in:
     if refresh or "_app_df" not in st.session_state:
         st.session_state["_app_df"] = upload_module()
     df = st.session_state.get("_app_df", None)
-    # 3. Show KPIs if data is present
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        fig = kpi_module(df)
-        # 4. DB Storage
-        database_module(df)
-        # 5. Export/Share Section
+    # Show Phase 2 notification/logging
+    notification_log(ingestor.messages if ingestor else [])
+    # Data source selection
+    active_source = data_source_selector()
+    used_df = None
+    if active_source == "Google Sheet":
+        used_df = st.session_state.get("source_GoogleSheet", None)
+    elif active_source == "Stripe":
+        used_df = st.session_state.get("source_Stripe", None)
+    elif active_source == "Shopify":
+        used_df = st.session_state.get("source_Shopify", None)
+    elif active_source == "QuickBooks":
+        used_df = st.session_state.get("source_QuickBooks", None)
+    # Default to manual upload if nothing else
+    if used_df is None:
+        used_df = df
+    # 4. Show KPIs if data is present
+    if isinstance(used_df, pd.DataFrame) and not used_df.empty:
+        fig = kpi_module(used_df)
+        # 5. DB Storage
+        database_module(used_df)
+        # 6. Export/Share Section
         export_module(fig)
     else:
-        st.info("Upload data (CSV or Google Sheet) to see dashboard features.")
+        st.info("Upload or auto-ingest data (CSV, Google Sheet, other sources) to see dashboard features.")
 else:
     st.warning("Log in to access dashboard features.")
-# ==================== END OF MVP ===================="}]}続きを入力してください。
