@@ -1,13 +1,14 @@
 """
 Echolon AI Dashboard MVP (Streamlit)
-Modular MVP covering Phases 1 & 2:
+Modular MVP covering Phases 1, 2 & 3:
  1. CSV/Google Sheets upload
  2. Real-time KPI charts/graphs
  3. Basic user authentication
  4. Database storage: Firebase/Supabase
  5. Manual data refresh
  6. Export/share to PDF/PNG
- 7. Phase 2: Live connectors, auto-refresh, multiple source/data status log
+ 7. Live connectors, auto-refresh, multiple source/data status log
+ 8. Phase 3: AI-Driven Forecasting Module (Prophet, ARIMA, or LSTM)
 """
 # ===================== Imports =====================
 import streamlit as st
@@ -22,12 +23,10 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import threading
 import time
-# Phase 2 imports (placeholders for now)
-# Stripe, Shopify, QuickBooks connectors (to be configured)
-# import stripe
-# import shopify
-# import quickbooks
-
+from prophet import Prophet  # For AI forecasting
+# Optionally, import ARIMA/LSTM modules as needed
+# from statsmodels.tsa.arima.model import ARIMA
+# from keras.models import Sequential
 # =================== PHASE 2 SCAFFOLDING ===================
 # --- Data source connection functions ---
 def fetch_google_sheet(sheet_url, creds_json):
@@ -51,13 +50,11 @@ def fetch_quickbooks_data():
     """Fetch data from QuickBooks API (placeholder function)."""
     # TODO: implement auth and fetch from QuickBooks
     return pd.DataFrame()
-
 def notification_log(messages):
     """Display notifications/logs in sidebar."""
     st.sidebar.markdown("## Data Update Log")
     for m in messages[-10:]:
         st.sidebar.info(m)
-
 # --- Auto-refresh/ingestion logic ---
 class AutoDataIngestor:
     """Class to handle periodic data refresh from multiple sources."""
@@ -92,14 +89,12 @@ class AutoDataIngestor:
             except Exception as e:
                 self.messages.append(f"{key}: Error {e}")
         self.last_refresh = datetime.now()
-
 # =============== 1. Basic User Authentication ===============
 def login_module():
     st.sidebar.title('User Login')
     # For MVP: simple checkbox as mock auth
     login_status = st.sidebar.checkbox("Login (mock)")
     return login_status
-
 # ============== 2. Data Upload Module ==============
 def upload_module():
     st.header("Data Upload")
@@ -120,7 +115,6 @@ def upload_module():
         except Exception as e:
             st.error(f"Google Sheets error: {e}")
     return df
-
 # ========= Multiple Data Source Selection =========
 def data_source_selector():
     st.sidebar.markdown("## Data Source Selector")
@@ -136,7 +130,6 @@ def data_source_selector():
         options.append("QuickBooks")
     selected = st.sidebar.selectbox("Active data source", options) if options else None
     return selected
-
 # ============= 3. KPI Chart/Graph Module =============
 def kpi_module(df):
     st.header("KPIs and Visualization")
@@ -154,17 +147,14 @@ def kpi_module(df):
         ax.plot(df[col])
     st.pyplot(fig)
     return fig
-
 # ============ 4. Database Storage Module ============
 def database_module(df):
     """Store to Firebase and Supabase (MVP/mock)"""
     st.info("Saving to DBs (demo mode)")
     # ...firebase/supabase logic as above...
-
 # ======= 5. Manual Data Refresh & App State Handling ========
 def refresh_module():
     return st.sidebar.button("Refresh Data")
-
 # =========== 6. Export/Share Module ===========
 def export_module(fig):
     st.subheader("Export/Share")
@@ -180,15 +170,65 @@ def export_module(fig):
             file_name=f"dashboard_chart.{export_type}",
             mime=mime
         )
-
+# ================= PHASE 3: AI FORECASTING MODULE =================
+# ----------- Modular Forecasting UI + Logic ------------
+def forecasting_module(df):
+    """
+    AI-driven forecasting module w/ Prophet (demo for MVP).
+    UI allows selecting metric (column), forecast model, date range, scenario simulation.
+    Shows confidence intervals and multiple projections.
+    """
+    st.header("Phase 3: AI-Driven Forecasting")
+    # Select column to forecast (must be numeric and have a time index)
+    time_col = st.selectbox("Select time/date column", df.columns)
+    value_col = st.selectbox("Select value column for forecasting", df.columns)
+    # Optional: filter for numeric columns
+    model_choice = st.radio("Forecasting Model", ["Prophet", "ARIMA", "LSTM (Demo)"])
+    # Select forecast horizon
+    horizon = st.slider("Forecast horizon (days)", min_value=7, max_value=90, value=30, step=1)
+    st.write("Forecasting for next:", horizon, "days")
+    # Date range for simulation
+    start_date = st.date_input("Simulation Start Date", value=pd.to_datetime(df[time_col]).min())
+    end_date = st.date_input("Simulation End Date", value=pd.to_datetime(df[time_col]).max())
+    # Prepare df (rename cols for Prophet)
+    forecast_df = pd.DataFrame({
+        'ds': pd.to_datetime(df[time_col]),
+        'y': df[value_col],
+    }).dropna()
+    # Create, fit, and forecast
+    fig = None
+    forecast_result = None
+    if model_choice == "Prophet" and len(forecast_df) > 2:
+        with st.spinner("Running Prophet Model..."):
+            m = Prophet()
+            m.fit(forecast_df)
+            future = m.make_future_dataframe(periods=horizon)
+            forecast_result = m.predict(future)
+            fig = m.plot(forecast_result)
+            st.pyplot(fig)
+            st.write(forecast_result[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(horizon))
+            # Visualize forecast vs. actual
+            st.subheader("Forecast vs. Actual")
+            plt.figure()
+            plt.plot(forecast_df["ds"], forecast_df["y"], label="Actual")
+            plt.plot(forecast_result["ds"], forecast_result["yhat"], label="Forecast")
+            plt.fill_between(forecast_result["ds"],
+                             forecast_result["yhat_lower"],
+                             forecast_result["yhat_upper"],
+                             color="orange", alpha=0.2, label="Confidence Interval")
+            plt.legend()
+            st.pyplot(plt.gcf())
+    # Placeholder logic for ARIMA/LSTM demos
+    if st.button("Store forecast in DB (Demo)") and forecast_result is not None:
+        st.success("Forecast results stored in DB (scaffold/demo)")
+        # Could add DB integration here
+    return fig, forecast_result
 # ===================== MAIN LAYOUT =====================
 st.set_page_config(page_title="Echolon AI Dashboard MVP", layout="wide")
-st.title("Echolon AI Dashboard — MVP + Live Data Sync Scaffold (Phases 1 & 2)")
-st.markdown("""Modular Streamlit dashboard for upload, KPIs, DB sync, live data, and export.""")
-
+st.title("Echolon AI Dashboard — MVP + Live Data Sync Scaffold (Phases 1, 2, & 3)")
+st.markdown("""Modular Streamlit dashboard for upload, KPIs, DB sync, live data, forecast, and export.""")
 # 1. User Login Module
 user_logged_in = login_module()
-
 # 2. Instantiate AutoDataIngestor singleton and register sources
 if "auto_ingestor" not in st.session_state:
     ingestor = AutoDataIngestor(refresh_interval=600)  # 10 min by default
@@ -214,7 +254,6 @@ if auto_ingest_enabled and sheet_url and creds_json:
 # ingestor.add_source("Stripe", fetch_stripe_data)
 # ingestor.add_source("Shopify", fetch_shopify_data)
 # ingestor.add_source("QuickBooks", fetch_quickbooks_data)
-
 # 3. Data manual upload & refresh
 refresh = refresh_module()
 if user_logged_in:
@@ -244,6 +283,8 @@ if user_logged_in:
         database_module(used_df)
         # 6. Export/Share Section
         export_module(fig)
+        # =============== 7. Phase 3: AI Forecasting UI ===============
+        forecasting_module(used_df)
     else:
         st.info("Upload or auto-ingest data (CSV, Google Sheet, other sources) to see dashboard features.")
 else:
