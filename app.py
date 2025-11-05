@@ -1,14 +1,6 @@
 """
-Echolon AI Dashboard MVP (Streamlit)
-Modular MVP covering Phases 1, 2 & 3:
- 1. CSV/Google Sheets upload
- 2. Real-time KPI charts/graphs
- 3. Basic user authentication
- 4. Database storage: Firebase/Supabase
- 5. Manual data refresh
- 6. Export/share to PDF/PNG
- 7. Live connectors, auto-refresh, multiple source/data status log
- 8. Phase 3: AI-Driven Forecasting Module (Prophet, ARIMA, or LSTM)
+Echolon AI Dashboard — All 6 MVP Phases Scaffold (Streamlit)
+Leave OpenAI API key blank in demo for security! Modular functions scaffolded for all phases.
 """
 # ===================== Imports =====================
 import streamlit as st
@@ -23,43 +15,53 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import threading
 import time
-from prophet import Prophet  # For AI forecasting
-# Optionally, import ARIMA/LSTM modules as needed
-# from statsmodels.tsa.arima.model import ARIMA
-# from keras.models import Sequential
-# =================== PHASE 2 SCAFFOLDING ===================
-# --- Data source connection functions ---
+# Optional: for forecasting
+from prophet import Prophet
+# ========================== PHASE 1 ==========================
+# User Authentication & Session Management
+# -------------------------------------------------------------
+def user_auth_module():
+    """Basic (mock) user authentication scaffold"""
+    st.sidebar.title('User Login')
+    login_status = st.sidebar.checkbox("Login (mock)")
+    return login_status
+# ========================== PHASE 2 ==========================
+# Data Upload & Ingestion (CSV/Google Sheets)
+# -------------------------------------------------------------
+def upload_module():
+    st.header("Data Upload")
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    sheet_url = st.text_input("Google Sheet URL")
+    creds_json = st.text_area("Paste Google API credentials (JSON)", "{}")
+    df = None
+    if uploaded_file:
+        try:
+            df = pd.read_csv(uploaded_file)
+            st.success("CSV uploaded!")
+        except Exception as e:
+            st.error(f"CSV error: {e}")
+    elif sheet_url and creds_json:
+        try:
+            df = fetch_google_sheet(sheet_url, creds_json)
+            st.success("Google Sheet loaded!")
+        except Exception as e:
+            st.error(f"Google Sheets error: {e}")
+    return df
+# --- Helper to connect Google Sheets ---
 def fetch_google_sheet(sheet_url, creds_json):
-    """Fetch data from Google Sheet."""
     scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(eval(creds_json), scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_url(sheet_url).sheet1
     data = sheet.get_all_records()
     return pd.DataFrame(data)
-# Placeholders for other connectors:
-def fetch_stripe_data():
-    """Fetch data from Stripe API (placeholder function)."""
-    # TODO: implement auth and fetch from Stripe
-    return pd.DataFrame()
-def fetch_shopify_data():
-    """Fetch data from Shopify API (placeholder function)."""
-    # TODO: implement auth and fetch from Shopify
-    return pd.DataFrame()
-def fetch_quickbooks_data():
-    """Fetch data from QuickBooks API (placeholder function)."""
-    # TODO: implement auth and fetch from QuickBooks
-    return pd.DataFrame()
-def notification_log(messages):
-    """Display notifications/logs in sidebar."""
-    st.sidebar.markdown("## Data Update Log")
-    for m in messages[-10:]:
-        st.sidebar.info(m)
-# --- Auto-refresh/ingestion logic ---
+# ========================== PHASE 3 ==========================
+# Live Data Sync (Auto-Refresh, Connectors)
+# -------------------------------------------------------------
 class AutoDataIngestor:
-    """Class to handle periodic data refresh from multiple sources."""
+    """Auto-refreshing manager for external data sources."""
     def __init__(self, refresh_interval=600):
-        self.refresh_interval = refresh_interval  # seconds (default: 10 min)
+        self.refresh_interval = refresh_interval
         self.last_refresh = None
         self.messages = []
         self.running = False
@@ -89,203 +91,95 @@ class AutoDataIngestor:
             except Exception as e:
                 self.messages.append(f"{key}: Error {e}")
         self.last_refresh = datetime.now()
-# =============== 1. Basic User Authentication ===============
-def login_module():
-    st.sidebar.title('User Login')
-    # For MVP: simple checkbox as mock auth
-    login_status = st.sidebar.checkbox("Login (mock)")
-    return login_status
-# ============== 2. Data Upload Module ==============
-def upload_module():
-    st.header("Data Upload")
-    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-    sheet_url = st.text_input("Google Sheet URL")
-    creds_json = st.text_area("Paste Google API credentials (JSON)", "{}")
-    df = None
-    if uploaded_file:
-        try:
-            df = pd.read_csv(uploaded_file)
-            st.success("CSV uploaded!")
-        except Exception as e:
-            st.error(f"CSV error: {e}")
-    elif sheet_url and creds_json:
-        try:
-            df = fetch_google_sheet(sheet_url, creds_json)
-            st.success("Google Sheet loaded!")
-        except Exception as e:
-            st.error(f"Google Sheets error: {e}")
-    return df
-# ========= Multiple Data Source Selection =========
-def data_source_selector():
-    st.sidebar.markdown("## Data Source Selector")
-    options = []
-    if "source_GoogleSheet" in st.session_state:
-        options.append("Google Sheet")
-    # Add for placeholder APIs
-    if "source_Stripe" in st.session_state:
-        options.append("Stripe")
-    if "source_Shopify" in st.session_state:
-        options.append("Shopify")
-    if "source_QuickBooks" in st.session_state:
-        options.append("QuickBooks")
-    selected = st.sidebar.selectbox("Active data source", options) if options else None
-    return selected
-# ============= 3. KPI Chart/Graph Module =============
-def kpi_module(df):
-    st.header("KPIs and Visualization")
-    st.write(f"Rows: {len(df)} | Columns: {len(df.columns)}")
-    st.dataframe(df.head())
-    st.subheader("Summary Statistics")
-    st.write(df.describe())
-    st.subheader("Charts & Graphs")
-    col = st.selectbox("Choose column to plot", df.columns)
-    chart_type = st.radio("Choose chart type", ["Histogram", "Line"])
-    fig, ax = plt.subplots()
-    if chart_type == "Histogram":
-        df[col].hist(ax=ax)
-    else:
-        ax.plot(df[col])
-    st.pyplot(fig)
-    return fig
-# ============ 4. Database Storage Module ============
-def database_module(df):
-    """Store to Firebase and Supabase (MVP/mock)"""
-    st.info("Saving to DBs (demo mode)")
-    # ...firebase/supabase logic as above...
-# ======= 5. Manual Data Refresh & App State Handling ========
-def refresh_module():
-    return st.sidebar.button("Refresh Data")
-# =========== 6. Export/Share Module ===========
-def export_module(fig):
-    st.subheader("Export/Share")
-    export_format = st.radio("Export Format", ["PDF", "PNG"])
-    if st.button("Export Chart"):
-        buf = io.BytesIO()
-        export_type = "pdf" if export_format == "PDF" else "png"
-        plt.savefig(buf, format=export_type)
-        mime = "application/pdf" if export_format == "PDF" else "image/png"
-        st.download_button(
-            label=f"Download {export_format}",
-            data=buf.getvalue(),
-            file_name=f"dashboard_chart.{export_type}",
-            mime=mime
-        )
-# ================= PHASE 3: AI FORECASTING MODULE =================
-# ----------- Modular Forecasting UI + Logic ------------
+# ========================== PHASE 4 ==========================
+# AI Forecasting Module — Prophet/ARIMA/LSTM
+# -------------------------------------------------------------
 def forecasting_module(df):
-    """
-    AI-driven forecasting module w/ Prophet (demo for MVP).
-    UI allows selecting metric (column), forecast model, date range, scenario simulation.
-    Shows confidence intervals and multiple projections.
-    """
-    st.header("Phase 3: AI-Driven Forecasting")
-    # Select column to forecast (must be numeric and have a time index)
+    """Prophet AI forecasting scaffold (demo: ARIMA, LSTM TODO)"""
+    st.header("AI-Driven Forecasting")
     time_col = st.selectbox("Select time/date column", df.columns)
-    value_col = st.selectbox("Select value column for forecasting", df.columns)
-    # Optional: filter for numeric columns
-    model_choice = st.radio("Forecasting Model", ["Prophet", "ARIMA", "LSTM (Demo)"])
-    # Select forecast horizon
-    horizon = st.slider("Forecast horizon (days)", min_value=7, max_value=90, value=30, step=1)
-    st.write("Forecasting for next:", horizon, "days")
-    # Date range for simulation
-    start_date = st.date_input("Simulation Start Date", value=pd.to_datetime(df[time_col]).min())
-    end_date = st.date_input("Simulation End Date", value=pd.to_datetime(df[time_col]).max())
-    # Prepare df (rename cols for Prophet)
+    value_col = st.selectbox("Select value column", df.columns)
+    model_choice = st.radio("Forecasting Model", ["Prophet", "ARIMA (Demo)", "LSTM (Demo)"])
+    horizon = st.slider("Horizon (days)", min_value=7, max_value=90, value=30)
     forecast_df = pd.DataFrame({
         'ds': pd.to_datetime(df[time_col]),
         'y': df[value_col],
     }).dropna()
-    # Create, fit, and forecast
     fig = None
     forecast_result = None
     if model_choice == "Prophet" and len(forecast_df) > 2:
-        with st.spinner("Running Prophet Model..."):
-            m = Prophet()
-            m.fit(forecast_df)
-            future = m.make_future_dataframe(periods=horizon)
-            forecast_result = m.predict(future)
-            fig = m.plot(forecast_result)
+        with st.spinner("Running Prophet ..."):
+            model = Prophet()
+            model.fit(forecast_df)
+            future = model.make_future_dataframe(periods=horizon)
+            forecast_result = model.predict(future)
+            fig = model.plot(forecast_result)
             st.pyplot(fig)
             st.write(forecast_result[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(horizon))
-            # Visualize forecast vs. actual
-            st.subheader("Forecast vs. Actual")
-            plt.figure()
-            plt.plot(forecast_df["ds"], forecast_df["y"], label="Actual")
-            plt.plot(forecast_result["ds"], forecast_result["yhat"], label="Forecast")
-            plt.fill_between(forecast_result["ds"],
-                             forecast_result["yhat_lower"],
-                             forecast_result["yhat_upper"],
-                             color="orange", alpha=0.2, label="Confidence Interval")
-            plt.legend()
-            st.pyplot(plt.gcf())
-    # Placeholder logic for ARIMA/LSTM demos
-    if st.button("Store forecast in DB (Demo)") and forecast_result is not None:
-        st.success("Forecast results stored in DB (scaffold/demo)")
-        # Could add DB integration here
+    # Placeholders for ARIMA/LSTM
     return fig, forecast_result
-# ===================== MAIN LAYOUT =====================
-st.set_page_config(page_title="Echolon AI Dashboard MVP", layout="wide")
-st.title("Echolon AI Dashboard — MVP + Live Data Sync Scaffold (Phases 1, 2, & 3)")
-st.markdown("""Modular Streamlit dashboard for upload, KPIs, DB sync, live data, forecast, and export.""")
-# 1. User Login Module
-user_logged_in = login_module()
-# 2. Instantiate AutoDataIngestor singleton and register sources
-if "auto_ingestor" not in st.session_state:
-    ingestor = AutoDataIngestor(refresh_interval=600)  # 10 min by default
-    st.session_state["auto_ingestor"] = ingestor
-else:
-    ingestor = st.session_state["auto_ingestor"]
-# Always update sources in the ingestor (for demo, allow Google Sheet with supplied URL/creds)
-if "google_sheet_url" not in st.session_state:
-    st.session_state["google_sheet_url"] = ""
-if "google_creds_json" not in st.session_state:
-    st.session_state["google_creds_json"] = "{}"
-# User can input them and enable auto-ingest from Google Sheets
-sheet_url = st.sidebar.text_input("Auto-Ingest: Google Sheet URL", st.session_state["google_sheet_url"])
-creds_json = st.sidebar.text_area("Auto-Ingest: Google API credentials", st.session_state["google_creds_json"])
-auto_ingest_enabled = st.sidebar.checkbox("Enable auto Google Sheet ingest (demo)")
-if auto_ingest_enabled and sheet_url and creds_json:
-    st.session_state["google_sheet_url"] = sheet_url
-    st.session_state["google_creds_json"] = creds_json
-    ingestor.add_source("GoogleSheet", fetch_google_sheet, params={"sheet_url":sheet_url,"creds_json":creds_json})
-    if not ingestor.running:
-        ingestor.start()
-# Demo: register placeholder sources
-# ingestor.add_source("Stripe", fetch_stripe_data)
-# ingestor.add_source("Shopify", fetch_shopify_data)
-# ingestor.add_source("QuickBooks", fetch_quickbooks_data)
-# 3. Data manual upload & refresh
-refresh = refresh_module()
-if user_logged_in:
-    if refresh or "_app_df" not in st.session_state:
-        st.session_state["_app_df"] = upload_module()
-    df = st.session_state.get("_app_df", None)
-    # Show Phase 2 notification/logging
-    notification_log(ingestor.messages if ingestor else [])
-    # Data source selection
-    active_source = data_source_selector()
-    used_df = None
-    if active_source == "Google Sheet":
-        used_df = st.session_state.get("source_GoogleSheet", None)
-    elif active_source == "Stripe":
-        used_df = st.session_state.get("source_Stripe", None)
-    elif active_source == "Shopify":
-        used_df = st.session_state.get("source_Shopify", None)
-    elif active_source == "QuickBooks":
-        used_df = st.session_state.get("source_QuickBooks", None)
-    # Default to manual upload if nothing else
-    if used_df is None:
-        used_df = df
-    # 4. Show KPIs if data is present
-    if isinstance(used_df, pd.DataFrame) and not used_df.empty:
-        fig = kpi_module(used_df)
-        # 5. DB Storage
-        database_module(used_df)
-        # 6. Export/Share Section
-        export_module(fig)
-        # =============== 7. Phase 3: AI Forecasting UI ===============
-        forecasting_module(used_df)
+# ========================== PHASE 5 ==========================
+# Workflow Optimization (Export, Manual Refresh, DB Sync)
+# -------------------------------------------------------------
+def manual_refresh_module():
+    return st.sidebar.button("Refresh Data")
+def export_module(fig):
+    st.subheader("Export Chart")
+    export_format = st.radio("Format", ["PDF", "PNG"])
+    if st.button("Export"):
+        buf = io.BytesIO()
+        export_type = "pdf" if export_format=="PDF" else "png"
+        plt.savefig(buf, format=export_type)
+        mime = "application/pdf" if export_format=="PDF" else "image/png"
+        st.download_button(label=f"Download {export_format}", data=buf.getvalue(), file_name=f"chart.{export_type}", mime=mime)
+# DB Scaffold
+
+def db_module(df):
+    st.info("Saving to DBs (scaffold/mock)")
+    # Firebase/Supabase logic as placeholder
+# ========================== PHASE 6 ==========================
+# Explainability (AI Chat) & Multi-user SaaS Scaling
+# -------------------------------------------------------------
+def explainability_ai_module():
+    st.header("Explainability — AI Chat")
+    chat_input = st.text_input("Ask about data, forecast, or optimization")
+    # Leave OpenAI API key blank for demo safety
+    api_key = ""   # DO NOT fill in!
+    if chat_input and api_key:
+        # TODO: Integrate chat model here
+        st.write("AI Response placeholder — connect OpenAI/other API")
     else:
-        st.info("Upload or auto-ingest data (CSV, Google Sheet, other sources) to see dashboard features.")
+        st.write("AI response unavailable (API key not set)")
+# ========== NAVIGATION ===========
+def navigation_menu():
+    phase = st.sidebar.radio("Echolon AI Dashboard Modules", [
+        "Upload/Sync", "Live Data Sync", "Forecasting", "Workflow Optimization", "Explainability (AI)", "SaaS Scaling"
+    ])
+    return phase
+# =============== MAIN APP ===============
+st.set_page_config(page_title="Echolon AI Dashboard Demo", layout="wide")
+st.title("Echolon AI Dashboard — 6 Modular MVP Phases Scaffold")
+selected_phase = navigation_menu()
+user_logged_in = user_auth_module()
+if user_logged_in:
+    # Upload, sync, live, forecast, workflow, explainability modules
+    if selected_phase == "Upload/Sync":
+        df = upload_module()
+        st.write(df)
+    elif selected_phase == "Live Data Sync":
+        st.info("Starter for connectors & auto-sync scaffold")
+    elif selected_phase == "Forecasting":
+        df = upload_module()
+        if df is not None:
+            forecasting_module(df)
+    elif selected_phase == "Workflow Optimization":
+        manual_refresh_module()
+        export_module(None)
+        db_module(None)
+    elif selected_phase == "Explainability (AI)":
+        explainability_ai_module()
+    elif selected_phase == "SaaS Scaling":
+        st.header("Multi-user/SaaS Scaling Scaffold")
+        st.write("Add scalable auth, workspace sharing, RBAC, and billing integrations")
 else:
     st.warning("Log in to access dashboard features.")
