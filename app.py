@@ -1,11 +1,9 @@
 import streamlit as st
 import pandas as pd
-import os
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 from datetime import datetime, timedelta
-import openai
-from streamlit_extras.add_vertical_space import add_vertical_space
+import numpy as np
 
 # ============ Page Config ============
 st.set_page_config(page_title="Echolon AI Dashboard", layout="wide", page_icon="🚀")
@@ -13,172 +11,148 @@ st.set_page_config(page_title="Echolon AI Dashboard", layout="wide", page_icon="
 # ============ Custom CSS ============
 st.markdown("""
 <style>
-body {background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 100%); color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
-.neon-header {font-size: 3em; font-weight: 900; text-align: center; color: #00d9ff; text-shadow: 0 0 10px #00d9ff,0 0 30px #00d9ff; margin-bottom: 20px;}
-.metric-card {background: linear-gradient(145deg, #1e1e3f, #2a2a5a); border-radius: 15px; padding: 20px; box-shadow: 0 8px 20px rgba(0,217,255,0.3); margin: 10px;}
-.neon-footer {position: fixed; bottom: 0; width: 100%; background: #1a1a2e; color: #00d9ff; text-align: center; box-shadow: 0 0 10px #00d9ff; padding: 10px 0; font-size: 1.3em;}<br>
-.info-icon {display:inline-block; width:18px; height:18px; background:#00d9ff; color:#fff; text-align:center; border-radius:50%; font-size:12px; line-height:18px; vertical-align:middle; margin-left:6px; cursor:pointer;}
+body {background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 100%); color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif;}
+.neon-header {font-size: 3em; font-weight: 900; text-align: center; color: #00d9ff; text-shadow: 0 0 10px #00d9ff, 0 0 20px #00d9ff;}
+.metric-card {background: linear-gradient(145deg, #1e1e3f, #2a2a5a); border-radius: 15px; padding: 20px; box-shadow: 0 0 20px rgba(0, 217, 255, 0.3); border: 2px solid #00d9ff; margin-bottom: 20px;}
+.neon-footer {position: fixed; bottom: 0; width: 100%; background: #1a1a2e; color: #00d9ff; text-align: center; padding: 15px; font-size: 1.5em; box-shadow: 0 0 20px rgba(0,255,153,0.5); border-top: 3px solid #00ff99;}
+.info-icon {display:inline-block; width:18px; height:18px; background:#00d9ff; color:#fff; text-align:center; border-radius:50%;}
+.ai-box {background: rgba(255,0,119,0.1); border: 2px solid #ff0077; border-radius: 10px; padding: 15px; margin: 10px 0;}
+.inv-box {background: rgba(0,255,153,0.1); border: 2px solid #00ff99; border-radius: 10px; padding: 15px; margin: 10px 0;}
+.wf-box {background: rgba(0,217,255,0.1); border: 2px solid #00d9ff; border-radius: 10px; padding: 15px; margin: 10px 0;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Echolon AI Dashboard 🚀")
+st.markdown("<h1 class='neon-header'>🚀 Echolon AI Dashboard</h1>", unsafe_allow_html=True)
 
 # ============ Sidebar Controls ============
 st.sidebar.header("Pro Features")
 
 # 1. CSV Data Pipeline Tester
-add_vertical_space(1)
 st.sidebar.subheader("CSV Data Pipeline Tester")
 csv_file = st.sidebar.file_uploader("Upload CSV Data", type=["csv"], help="Upload your sales CSV file.")
 csv_df = None
-column_map = {}
-running_data = False
-if csv_file:
-    try:
-        csv_df = pd.read_csv(csv_file)
-        st.sidebar.write("Preview:")
-        st.sidebar.dataframe(csv_df.head())
-        cols_orig = csv_df.columns.tolist()
-        st.sidebar.write("Column Mapper:")
-        col1 = st.sidebar.selectbox("Date Column", cols_orig)
-        col2 = st.sidebar.selectbox("Revenue Column", cols_orig)
-        col3 = st.sidebar.selectbox("Category Column", cols_orig)
-        col4 = st.sidebar.selectbox("Region Column", cols_orig)
-        col5 = st.sidebar.selectbox("Product Column", cols_orig)
-        if st.sidebar.button("Run Pipeline"):
-            column_map = {'Date': col1, 'Revenue': col2, 'Category': col3, 'Region': col4, 'Product': col5}
-            running_data = True
-    except Exception as e:
-        st.sidebar.error(f"Error loading file: {e}")
+if csv_file is not None:
+    csv_df = pd.read_csv(csv_file)
+    st.sidebar.success("CSV uploaded!")
+    st.sidebar.dataframe(csv_df.head())
 
-# 5. Show/Hide Module Toggles
-st.sidebar.subheader("Show/Hide Dashboard Modules")
-show_time_trend = st.sidebar.checkbox("Time Trend Chart", True)
-show_category_pie = st.sidebar.checkbox("Category Pie Chart", True)
-show_region_bar = st.sidebar.checkbox("Region Bar Chart", True)
-show_top_products = st.sidebar.checkbox("Top 5 Products", True)
-show_metrics = st.sidebar.checkbox("Key Metrics", True)
-show_recs = st.sidebar.checkbox("Recommendations", True)
+# 2. Module Toggles
+st.sidebar.subheader("Toggle Modules")
+show_sales = st.sidebar.checkbox("Show Sales & Behavior", value=True)
+show_inventory = st.sidebar.checkbox("Show Inventory Optimization", value=True)
+show_workflow = st.sidebar.checkbox("Show Workflow Efficiency", value=True)
 
-# 4. Dashboard Tour Popup
-add_vertical_space(1)
-def tour_content():
-    st.sidebar.info("""
-        **Dashboard Tour Tips:**
-        - Upload your CSV sales file and map columns in the sidebar.
-        - Use toggle switches to show/hide dashboard modules.
-        - Hover info icons for metric tips.
-        - Ask dashboard questions using OpenAI sidebar input!
-        """, icon="🚀")
-open_tour = st.sidebar.button("Show Dashboard Tour & Tips")
-if open_tour: tour_content()
+# 3. Dashboard Tour
+if st.sidebar.button("Show Dashboard Tour & Tips"):
+    st.sidebar.info("""\n    **Dashboard Features:**\n    - Upload CSV for dynamic data\n    - Toggle modules on/off\n    - AI insights in each section\n    - Glowing savings footer\n    """)
 
-# 6. OpenAI 'Ask the Dashboard'
-add_vertical_space(1)
-st.sidebar.subheader("Ask the Dashboard (OpenAI)")
-query = st.sidebar.text_input("Type a dashboard question:")
-response = None
-OPENAI_KEY = None
-try:
-    import toml
-    secrets = toml.load(".streamlit/secrets.toml")
-    OPENAI_KEY = secrets.get("OPENAI_API_KEY", None)
-except Exception:
-    OPENAI_KEY = os.environ.get("OPENAI_API_KEY", None)
-if query and OPENAI_KEY:
-    openai.api_key = OPENAI_KEY
-    resp = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": query}], max_tokens=150)
-    response = resp['choices'][0]['message']['content']
-    st.sidebar.success(response)
-elif query:
-    st.sidebar.error("OpenAI key missing! Add it to secrets.toml or env.")
+# 4. Ask the Dashboard (OpenAI)
+st.sidebar.subheader("Ask the Dashboard")
+user_question = st.sidebar.text_input("Ask a business question...")
+if user_question:
+    st.sidebar.write("💡 AI Response: Your question has been received. Connect OpenAI API for live answers.")
 
-# ============ Main Dashboard Data ============
-if running_data and csv_df is not None and column_map:
-    sales = csv_df.rename(columns=column_map)
-else:
-    sales = pd.DataFrame({  # fallback sample
-'todo':[]})  # Fill with demo/sample/default if desired
+# ============ Sample/Demo Data ============
+def create_sample_data():
+    dates = pd.date_range(end=datetime.now(), periods=180, freq='D')
+    sales = pd.DataFrame({
+        'Date': dates,
+        'Revenue': np.random.randint(8000, 12000, 180),
+        'Orders': np.random.randint(80, 120, 180)
+    })
+    inventory = pd.DataFrame({
+        'SKU': ['Item A', 'Item B', 'Item C', 'Item D', 'Item E'],
+        'Stock': [450, 230, 89, 567, 12],
+        'Status': ['Healthy', 'Low', 'Critical', 'Healthy', 'Stockout']
+    })
+    workflow = pd.DataFrame({
+        'Task': ['Data Processing', 'Reporting', 'Customer Outreach', 'Inventory Sync'],
+        'Time_Saved_Hours': [45, 32, 28, 19]
+    })
+    return sales, inventory, workflow
 
-# ============ Main Area ============
-key_metrics = None
-if not sales.empty:
-    # Key Metrics
-    if show_metrics:
-        with st.expander("Key Financial Metrics", expanded=True):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                val = sales['Revenue'].sum()
-                st.metric("Total Revenue", f"${val:,.0f}")
-                st.caption(f'<span class="info-icon" title="Sum of all sales revenue">i</span>', unsafe_allow_html=True)
-            with col2:
-                avg = sales['Revenue'].mean()
-                st.metric("Average Sale", f"${avg:,.2f}")
-                st.caption(f'<span class="info-icon" title="Average deal size across the dataset">i</span>', unsafe_allow_html=True)
-            with col3:
-                cnt = sales['Product'].nunique()
-                st.metric("Unique Products", f"{cnt}")
-                st.caption(f'<span class="info-icon" title="Number of unique products sold">i</span>', unsafe_allow_html=True)
+sales_df, inventory_df, workflow_df = create_sample_data()
 
-    # Time Trend Chart
-    if show_time_trend:
-        with st.expander("Monthly Revenue Trend Chart", expanded=True):
-            try:
-                sales['Date'] = pd.to_datetime(sales['Date'])
-                revenue_time = sales.groupby(sales['Date'].dt.to_period('M')).agg({'Revenue':'sum'}).reset_index()
-                revenue_time['Date'] = revenue_time['Date'].dt.to_timestamp()
-                fig_time = px.line(revenue_time, x='Date', y='Revenue', title="Monthly Revenue Trend", template="plotly_dark")
-                fig_time.update_traces(line_color='#00d9ff', line_width=3)
-                st.plotly_chart(fig_time, use_container_width=True)
-                st.caption(f'<span class="info-icon" title="Shows monthly revenue trend based on uploaded data">i</span>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Failed to generate trend chart: {e}")
+# Use CSV if uploaded and has expected columns
+if csv_df is not None:
+    if 'Date' in csv_df.columns and 'Revenue' in csv_df.columns:
+        sales_df = csv_df
 
-    # Category Pie Chart
-    if show_category_pie:
-        with st.expander("Revenue by Category Pie Chart", expanded=True):
-            try:
-                category_revenue = sales.groupby('Category')['Revenue'].sum().reset_index()
-                fig_pie = px.pie(category_revenue, names='Category', values='Revenue', title="Category Distribution", template="plotly_dark", color_discrete_sequence=px.colors.sequential.ice)
-                st.plotly_chart(fig_pie, use_container_width=True)
-                st.caption(f'<span class="info-icon" title="Shows proportion of revenue per product category">i</span>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Failed to generate category pie: {e}")
+# ============ Three-Column Neon Grid Layout ============
+col1, col2, col3 = st.columns(3)
 
-    # Region Bar Chart
-    if show_region_bar:
-        with st.expander("Revenue by Region Bar Chart", expanded=True):
-            try:
-                region_revenue = sales.groupby('Region')['Revenue'].sum().reset_index().sort_values('Revenue', ascending=False)
-                fig_region = px.bar(region_revenue, x='Region', y='Revenue', title="Regional Performance", template="plotly_dark", color='Revenue', color_continuous_scale='Teal')
-                st.plotly_chart(fig_region, use_container_width=True)
-                st.caption(f'<span class="info-icon" title="Compare revenue across different sales regions">i</span>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Failed to generate region bar: {e}")
+# ----------- COLUMN 1: Sales & Behavior Predictive Analytics -----------
+if show_sales:
+    with col1:
+        st.markdown("<div class='metric-card'><h2 style='color:#ff0077;'>📊 Sales & Behavior Predictive Analytics</h2></div>", unsafe_allow_html=True)
+        
+        # Chart
+        fig1 = go.Figure()
+        monthly = sales_df.groupby(pd.Grouper(key='Date', freq='M'))['Revenue'].sum().reset_index()
+        fig1.add_trace(go.Scatter(x=monthly['Date'], y=monthly['Revenue'], mode='lines+markers', 
+                                  line=dict(color='#ff0077', width=3), marker=dict(size=8)))
+        fig1.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                           title="Monthly Revenue Trend", height=250)
+        st.plotly_chart(fig1, use_container_width=True)
+        
+        # AI Directives
+        st.markdown("<div class='ai-box'><b>🤖 AI Directive:</b> Increase up-sell campaigns for high-value customers in Q4. Predicted +18% conversion.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='ai-box'><b>⚠️ Churn Alert:</b> 3 customers at high risk. Immediate outreach recommended to retain $45K ARR.</div>", unsafe_allow_html=True)
+        
+        # Metrics
+        total_revenue = sales_df['Revenue'].sum()
+        churn_risk_score = 67
+        active_users = 1847
+        st.metric("Total Revenue (180d)", f"${total_revenue:,}")
+        st.metric("Churn Risk Score", f"{churn_risk_score}%", delta="-5%")
+        st.metric("Active Users", f"{active_users:,}")
 
-    # Top 5 Products
-    if show_top_products:
-        with st.expander("Top 5 Products", expanded=True):
-            try:
-                top_products = sales.groupby('Product')['Revenue'].sum().reset_index().sort_values('Revenue', ascending=False).head(5)
-                fig_products = px.bar(top_products, x='Revenue', y='Product', orientation='h', title="Best Sellers", template="plotly_dark", color='Revenue', color_continuous_scale='Blues')
-                st.plotly_chart(fig_products, use_container_width=True)
-                st.caption(f'<span class="info-icon" title="Best performing products by revenue">i</span>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Failed to generate top products chart: {e}")
+# ----------- COLUMN 2: Inventory Optimization -----------
+if show_inventory:
+    with col2:
+        st.markdown("<div class='metric-card'><h2 style='color:#00ff99;'>📦 Inventory Optimization</h2></div>", unsafe_allow_html=True)
+        
+        # Chart
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(x=inventory_df['SKU'], y=inventory_df['Stock'], marker=dict(color='#00ff99')))
+        fig2.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                           title="Current Stock Levels", height=250)
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        # AI Insights
+        st.markdown("<div class='inv-box'><b>✓ Optimization Tip:</b> Item E will stockout in 3 days. Auto-reorder triggered for 500 units.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='inv-box'><b>💡 AI Insight:</b> Item A is overstocked by 22%. Suggest promotional discount to clear inventory.</div>", unsafe_allow_html=True)
+        
+        # Inventory Table
+        st.dataframe(inventory_df, use_container_width=True)
 
-    # Recommendations & Help Tooltips
-    if show_recs:
-        with st.expander("AI Recommendations & Tips", expanded=True):
-            st.write("- Check regions with below average sales for improvement opportunities.")
-            st.write("- Focus marketing on top categories identified above.")
-            st.write("- Ask the dashboard any business question using the sidebar!")
-            st.caption(f'<span class="info-icon" title="Automated suggestions based on current dashboard analytics">i</span>', unsafe_allow_html=True)
+# ----------- COLUMN 3: Workflow Efficiency -----------
+if show_workflow:
+    with col3:
+        st.markdown("<div class='metric-card'><h2 style='color:#00d9ff;'>⚡ Workflow Efficiency</h2></div>", unsafe_allow_html=True)
+        
+        # Chart
+        fig3 = go.Figure()
+        fig3.add_trace(go.Pie(labels=workflow_df['Task'], values=workflow_df['Time_Saved_Hours'], 
+                              marker=dict(colors=['#00d9ff', '#ff0077', '#00ff99', '#ffaa00'])))
+        fig3.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', height=250, showlegend=True)
+        st.plotly_chart(fig3, use_container_width=True)
+        
+        # AI Recommendations
+        st.markdown("<div class='wf-box'><b>📋 Active Tasks:</b> AI suggests automating 'Customer Outreach' next. Est. 40hrs/month saved.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='wf-box'><b>⚡ Optimization:</b> Workflow efficiency up 34% this month. Reallocate resources to high-priority tasks.</div>", unsafe_allow_html=True)
+        
+        # Metrics
+        total_time_saved = workflow_df['Time_Saved_Hours'].sum()
+        efficiency_pct = 87
+        st.metric("Total Time Saved (hrs)", f"{total_time_saved}")
+        st.metric("Overall Efficiency", f"{efficiency_pct}%", delta="+12%")
 
 # ============ Glowing Savings Footer ============
-if not sales.empty:
-    savings_amt = int(sales['Revenue'].sum() * 0.12)
-    footer_html = f"""
-        <div class='neon-footer'>✨ AI-Driven Savings<br>${savings_amt:,} savings projected from workflow & analytics automation</div>
-    """
-    st.markdown(footer_html, unsafe_allow_html=True)
+savings_amt = 205890
+footer_html = f"""
+<div class='neon-footer'>
+    ✨ <b>AI-Driven Savings:</b> ${savings_amt:,} projected from workflow & analytics automation
+</div>
+"""
+st.markdown(footer_html, unsafe_allow_html=True)
