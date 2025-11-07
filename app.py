@@ -22,7 +22,7 @@ body {background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 100%); color: #fff
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 class='neon-header'>🚀 Echolon AI Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='neon-header'> Echolon AI Dashboard</h1>", unsafe_allow_html=True)
 
 # ============ Sidebar Controls ============
 st.sidebar.header("Pro Features")
